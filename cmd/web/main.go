@@ -2,37 +2,35 @@ package main
 
 import (
 	"flag"
+	"io"
 	"log"
 	"net/http"
-	"strings"
-
-	"github.com/kevin-cantwell/gotalk"
+	"os"
+	"os/exec"
 
 	"github.com/gorilla/mux"
-	"golang.org/x/net/context"
 )
 
 var (
 	hostPort = 3999
 )
 
+// Assumes that present is running at $GOPATH/src
 func main() {
-	var port = flag.String("port", "5555", "The port to accept web requests.")
+	var port = flag.String("port", "3998", "The port to accept web requests.")
+	// var origin = flag.String("origin", "127.0.0.1", "The origin host.")
 	flag.Parse()
 
 	r := mux.NewRouter()
-	r.HandleFunc("/{repo:[^!]+}{sep:!?}{path:.*}", func(w http.ResponseWriter, r *http.Request) {
-		repo := mux.Vars(r)["repo"]
-		if status := gotalk.GetContainerStatus(repo); status == nil {
-			if err := StartContainer(w, r); err != nil {
-				handleErr(w, "Failed to start container: "+err.Error(), "Failed to start presentation.", http.StatusInternalServerError)
-				return
-			}
-		}
-		if err := ServePresentation(w, r); err != nil {
-			handleErr(w, "Failed to serve presentation: "+err.Error(), "The presentation is not available.", http.StatusInternalServerError)
+	r.HandleFunc("/static/{any:.*}", proxy)
+	r.HandleFunc("/play.js", proxy)
+	r.HandleFunc("/github.com/{user:.+}/{name:[^/]+}{path:.*}", func(w http.ResponseWriter, r *http.Request) {
+		repo := "github.com/" + mux.Vars(r)["user"] + "/" + mux.Vars(r)["name"]
+		if err := maybeCloneGitRepo(repo); err != nil {
+			handleErr(w, "Failed to clone git repo: "+repo+": "+err.Error(), "Failed clone repo.", http.StatusInternalServerError)
 			return
 		}
+		proxy(w, r)
 	})
 	log.Println("Listening on :" + *port)
 	http.ListenAndServe(":"+*port, r)
@@ -43,28 +41,31 @@ func handleErr(w http.ResponseWriter, logMsg string, clientMsg string, status in
 	http.Error(w, clientMsg, status)
 }
 
-func StartContainer(w http.ResponseWriter, r *http.Request) error {
-	repo := mux.Vars(r)["repo"]
-	log.Println("Starting containter for repo:", repo)
-	hostInfo := strings.Split(r.Host, ":")
-	originHost, originPort := hostInfo[0], hostInfo[1]
-	if originPort == "" {
-		originPort = "80"
-	}
-	_, err := gotalk.StartContainer(context.TODO(), repo, originHost, originPort)
+func proxy(w http.ResponseWriter, r *http.Request) {
+	log.Println("Proxying request:", r.URL.Path)
+	resp, err := http.Get("http://127.0.0.1:3999" + r.URL.Path)
 	if err != nil {
-		return err
+		handleErr(w, "Failed to get path from present: "+err.Error(), "Failed to load presentation.", http.StatusInternalServerError)
+		return
 	}
-	return nil
+	defer resp.Body.Close()
+	for key, values := range resp.Header {
+		w.Header()[key] = values
+	}
+	io.Copy(w, resp.Body)
 }
 
-func ServePresentation(w http.ResponseWriter, r *http.Request) error {
-	// repo := mux.Vars("repo")
-	// status := gotalk.GetContainerStatus(repo)
-	path := mux.Vars(r)["path"]
-	log.Println("Serving presentation path:", "/"+path)
-	w.Write([]byte(path))
-
-	// resp, err := http.Get("http://")
+func maybeCloneGitRepo(repo string) error {
+	dir := os.Getenv("GOPATH") + "/src/" + repo
+	if _, err := os.Stat(dir); err != nil {
+		if os.IsNotExist(err) {
+			log.Println("Cloning:", "git", "clone", "https://"+repo+".git", dir)
+			cmd := exec.Command("git", "clone", "https://"+repo+".git", dir)
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			return cmd.Run()
+		}
+		return err
+	}
 	return nil
 }
