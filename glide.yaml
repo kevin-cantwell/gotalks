@@ -1,4 +1,4 @@
-package: github.com/kevin-cantwell/gotalk
+package: github.com/kevin-cantwell/gotalks
 import:
 - package: github.com/gorilla/mux
 - package: golang.org/x/net
