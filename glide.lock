@@ -1,0 +1,18 @@
+hash: bcabed565f74cdb82d7cb50367e5f24d6ad5526b84c25e0bb8ec60f0ddb796ba
+updated: 2016-07-14T22:42:06.402070678-04:00
+imports:
+- name: github.com/gorilla/context
+  version: aed02d124ae4a0e94fea4541c8effd05bf0c8296
+- name: github.com/gorilla/mux
+  version: 9fa818a44c2bf1396a17f9d5a3c0f6dd39d2ff8e
+- name: golang.org/x/crypto
+  version: 10c26747e67d76ad4fafe6087c6f4073c3b22942
+  subpackages:
+  - ssh/terminal
+- name: golang.org/x/net
+  version: a728288923b47049b2ce791836767ffbe964a5bd
+  subpackages:
+  - context
+- name: golang.org/x/text
+  version: d5d7737684e596dbabf914ecf946d2783f35bdc2
+devImports: []

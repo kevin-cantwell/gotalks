@@ -2,12 +2,14 @@
 
 set -e
 
-repo=$1
-orighost=$2
-port=$3
+# Kill all child processes on exit
+trap 'pkill -P $$' SIGINT SIGTERM EXIT
 
-git clone https://$repo.git gotalk
+gotalk_host=$1
+gotalk_port=$2
 
-cd gotalk
+cd $GOPATH/src
+present -notes -play=false -http=0.0.0.0:3999 -orighost=$gotalk_host >> /var/log/present.log 2>&1 &
+PORT=$gotalk_port gotalk >> /var/log/gotalk.log 2>&1 &
 
-present -notes -http=0.0.0.0:$port -orighost=$orighost
+tail -f /var/log/present.log /var/log/gotalk.log

@@ -18,14 +18,13 @@ var (
 // Assumes that present is running at $GOPATH/src
 func main() {
 	var port = flag.String("port", "3998", "The port to accept web requests.")
-	// var origin = flag.String("origin", "127.0.0.1", "The origin host.")
 	flag.Parse()
 
 	r := mux.NewRouter()
-	r.HandleFunc("/static/{any:.*}", proxy)
+	r.HandleFunc("/static/{asset:.*}", proxy)
 	r.HandleFunc("/play.js", proxy)
-	r.HandleFunc("/github.com/{user:.+}/{name:[^/]+}{path:.*}", func(w http.ResponseWriter, r *http.Request) {
-		repo := "github.com/" + mux.Vars(r)["user"] + "/" + mux.Vars(r)["name"]
+	r.HandleFunc("/{repo:github.com/[^/]+/[^/]+}{resource:/?.*}", func(w http.ResponseWriter, r *http.Request) {
+		repo := mux.Vars(r)["repo"]
 		if err := maybeCloneGitRepo(repo); err != nil {
 			handleErr(w, "Failed to clone git repo: "+repo+": "+err.Error(), "Failed clone repo.", http.StatusInternalServerError)
 			return
@@ -59,7 +58,7 @@ func maybeCloneGitRepo(repo string) error {
 	dir := os.Getenv("GOPATH") + "/src/" + repo
 	if _, err := os.Stat(dir); err != nil {
 		if os.IsNotExist(err) {
-			log.Println("Cloning:", "git", "clone", "https://"+repo+".git", dir)
+			log.Println("Cloning:", "git", "clone", "--depth", "1", "https://"+repo+".git", dir)
 			cmd := exec.Command("git", "clone", "https://"+repo+".git", dir)
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
